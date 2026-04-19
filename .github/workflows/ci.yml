@@ -1,1 +1,41 @@
+name: SQL CI
 
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  test-sql:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_PASSWORD: testpass
+          POSTGRES_DB: rental_db
+        options: >-
+          --health-cmd "pg_isready"
+          --health-interval 10s
+        ports:
+          - 5432:5432
+
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Install PostgreSQL client
+        run: sudo apt-get install -y postgresql-client
+
+      - name: Create schema
+        run: |
+          psql -h localhost -U postgres -d rental_db -f sql/01_schema.sql
+          psql -h localhost -U postgres -d rental_db -f sql/02_roles.sql
+          psql -h localhost -U postgres -d rental_db -f sql/03_rls_policies.sql
+          psql -h localhost -U postgres -d rental_db -f sql/04_test_data.sql
+          psql -h localhost -U postgres -d rental_db -f sql/05_grants.sql
+
+      - name: Run tests
+        run: |
+          psql -h localhost -U postgres -d rental_db -f tests/test_client_isolation.sql
+          psql -h localhost -U postgres -d rental_db -f tests/test_passport_hidden.sql
